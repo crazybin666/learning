@@ -1,7 +1,18 @@
 import { GoogleGenAI, Type, Schema, Modality } from "@google/genai";
 import { CEFRLevel, ArticleData, Question, VocabularyWord } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to safely get the AI client
+// This prevents the app from crashing on load if the API Key is missing.
+const getAiClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    console.error("API_KEY is missing from environment variables.");
+    // We return a client with a dummy key to strictly prevent "undefined" errors, 
+    // but the API call will fail gracefully later with a proper error message.
+    return new GoogleGenAI({ apiKey: "missing-key" });
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 // Helper to format prompt
 const createSystemInstruction = () => `
@@ -15,6 +26,7 @@ export const generateArticle = async (
   keywords: string
 ): Promise<ArticleData> => {
   const model = "gemini-2.5-flash";
+  const ai = getAiClient();
   
   const topic = keywords ? keywords : interests.join(", ");
   
@@ -76,6 +88,7 @@ export const generateArticle = async (
 
 export const generateQuiz = async (articleContent: string): Promise<Question[]> => {
   const model = "gemini-2.5-flash";
+  const ai = getAiClient();
   
   const prompt = `
     Based on the following article, create 3 reading comprehension questions.
@@ -131,6 +144,7 @@ export const generateQuiz = async (articleContent: string): Promise<Question[]> 
 export const generateSpeech = async (text: string): Promise<string> => {
     // Clean the text of {{}} markers for speech
     const cleanText = text.replace(/\{\{/g, '').replace(/\}\}/g, '');
+    const ai = getAiClient();
 
     try {
         const response = await ai.models.generateContent({
