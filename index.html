@@ -5,33 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Readlingua - AI English Learning</title>
     
-    <!-- 1. Error Handling: Display errors on screen for mobile debugging -->
-    <script>
-      window.onerror = function(msg, url, line, col, error) {
-        var div = document.createElement('div');
-        div.style.position = 'fixed';
-        div.style.top = '0';
-        div.style.left = '0';
-        div.style.width = '100%';
-        div.style.backgroundColor = 'rgba(200, 0, 0, 0.9)';
-        div.style.color = 'white';
-        div.style.padding = '10px';
-        div.style.zIndex = '9999';
-        div.style.fontSize = '12px';
-        div.style.wordBreak = 'break-all';
-        div.innerText = 'Error: ' + msg + '\n' + url + ':' + line;
-        document.body.appendChild(div);
-        return false;
-      };
-      
-      // 2. Polyfill process.env for browser environment to prevent crash in geminiService
-      window.process = {
-        env: {
-          API_KEY: '' // API Key should be handled securely, or input by user in a real app
-        }
-      };
-    </script>
-
+    <!-- Tailwind CSS (CDN for simplicity in this setup) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -58,31 +32,25 @@
     <style>
       body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
       .article-text { font-family: 'Merriweather', serif; line-height: 1.8; }
-      /* Safe area for mobile */
       .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
     </style>
-    
-    <script type="importmap">
+<script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.2.0/client",
-    "react-dom": "https://esm.sh/react-dom@19.2.0",
-    "react": "https://esm.sh/react@19.2.0",
-    "react/jsx-runtime": "https://esm.sh/react@19.2.0/jsx-runtime",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4"
   }
 }
 </script>
-    <!-- 3. Babel for compiling TSX in browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
   <body class="bg-slate-50 text-slate-900 min-h-screen">
     <div id="root"></div>
     
-    <!-- 4. Load the App Entry Point -->
-    <!-- Note: In HBuilderX, ensure files are in the same directory. Using babel to compile TSX on the fly. -->
-    <script type="text/babel" data-presets="react,typescript" src="./index.tsx"></script>
+    <!-- Vite Entry Point -->
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

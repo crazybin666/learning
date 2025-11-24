@@ -1,8 +1,7 @@
 import { GoogleGenAI, Type, Schema, Modality } from "@google/genai";
 import { CEFRLevel, ArticleData, Question, VocabularyWord } from "../types";
 
-const apiKey = process.env.API_KEY || ''; // Injected by environment
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper to format prompt
 const createSystemInstruction = () => `

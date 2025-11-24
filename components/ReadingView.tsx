@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ArticleData, VocabularyWord, Language } from '../types';
 import { Button } from './Button';
 import { generateSpeech } from '../services/geminiService';
@@ -10,15 +10,126 @@ interface ReadingViewProps {
   lang: Language;
 }
 
+// Helper functions for PCM audio decoding
+function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
 // Helper to sanitize word for matching
 const cleanWord = (w: string) => w.toLowerCase().replace(/[^a-z]/g, '');
 
 export const ReadingView: React.FC<ReadingViewProps> = ({ article, onFinish, lang }) => {
   const [selectedWord, setSelectedWord] = useState<VocabularyWord | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBase64, setAudioBase64] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+
+  useEffect(() => {
+      // Cleanup on unmount
+      return () => {
+          if (sourceNodeRef.current) {
+              sourceNodeRef.current.stop();
+          }
+          if (audioContextRef.current) {
+              audioContextRef.current.close();
+          }
+      };
+  }, []);
+
+  const playAudioData = async (base64: string) => {
+    try {
+        if (!audioContextRef.current) {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            audioContextRef.current = new AudioContextClass({sampleRate: 24000});
+        }
+        const ctx = audioContextRef.current;
+        if (ctx.state === 'suspended') {
+            await ctx.resume();
+        }
+
+        const bytes = decode(base64);
+        const audioBuffer = await decodeAudioData(bytes, ctx, 24000, 1);
+        
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        
+        source.onended = () => {
+            setIsPlaying(false);
+            sourceNodeRef.current = null;
+        };
+        
+        sourceNodeRef.current = source;
+        source.start();
+        setIsPlaying(true);
+    } catch (error) {
+        console.error("Audio playback error:", error);
+        setIsPlaying(false);
+    }
+  };
+
+  const stopAudio = () => {
+      if (sourceNodeRef.current) {
+          try {
+              sourceNodeRef.current.stop();
+          } catch (e) {
+              // ignore
+          }
+          sourceNodeRef.current = null;
+      }
+      setIsPlaying(false);
+  };
+
+  const handlePlayAudio = async () => {
+    if (isPlaying) {
+        stopAudio();
+        return;
+    }
+
+    if (audioBase64) {
+        await playAudioData(audioBase64);
+        return;
+    }
+
+    setIsLoadingAudio(true);
+    try {
+        const base64 = await generateSpeech(article.content);
+        setAudioBase64(base64);
+        await playAudioData(base64);
+    } catch (e) {
+        alert("Could not generate audio.");
+    } finally {
+        setIsLoadingAudio(false);
+    }
+  };
 
   // Parse content to identify interactive words
   const renderContent = () => {
@@ -47,38 +158,6 @@ export const ReadingView: React.FC<ReadingViewProps> = ({ article, onFinish, lan
     });
   };
 
-  const handlePlayAudio = async () => {
-    if (audioUrl) {
-        if (isPlaying) {
-            audioRef.current?.pause();
-            setIsPlaying(false);
-        } else {
-            audioRef.current?.play();
-            setIsPlaying(true);
-        }
-        return;
-    }
-
-    setIsLoadingAudio(true);
-    try {
-        const base64 = await generateSpeech(article.content);
-        const url = `data:audio/mp3;base64,${base64}`;
-        setAudioUrl(url);
-        // Little delay to ensure state updates before playing
-        setTimeout(() => {
-            if (audioRef.current) {
-                audioRef.current.src = url;
-                audioRef.current.play();
-                setIsPlaying(true);
-            }
-        }, 100);
-    } catch (e) {
-        alert("Could not generate audio.");
-    } finally {
-        setIsLoadingAudio(false);
-    }
-  };
-
   const playWord = (text: string) => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
@@ -87,13 +166,6 @@ export const ReadingView: React.FC<ReadingViewProps> = ({ article, onFinish, lan
 
   return (
     <div className="max-w-2xl mx-auto p-4 pb-24 relative">
-      {/* Audio Element Hidden */}
-      <audio 
-        ref={audioRef} 
-        onEnded={() => setIsPlaying(false)} 
-        onPause={() => setIsPlaying(false)} 
-      />
-
       <div className="flex justify-between items-end mb-6 border-b border-slate-200 pb-4">
         <h1 className="text-2xl font-bold font-serif text-slate-900 leading-tight">
           {article.title}
